@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
+	"os"
 	"strconv"
 )
 
@@ -19,4 +20,12 @@ func IntToHex(num int64) []byte {
 
 func intToHex(i int64) []byte {
 	return []byte(strconv.FormatInt(i, 16))
+}
+
+func dbExists() bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }
