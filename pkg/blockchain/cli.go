@@ -4,7 +4,6 @@ import (
 	"flag"
 	"github.com/sirupsen/logrus"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -22,6 +21,8 @@ func (cli *CLI) Run() error {
 
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	createBlockchainCmd := flag.NewFlagSet("createblockchain", flag.ExitOnError)
+	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
+	listAddressesCmd := flag.NewFlagSet("listaddresses", flag.ExitOnError)
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 
@@ -38,6 +39,14 @@ func (cli *CLI) Run() error {
 		}
 	case "createblockchain":
 		if err := createBlockchainCmd.Parse(os.Args[2:]); err != nil {
+			return err
+		}
+	case "createwallet":
+		if err := createWalletCmd.Parse(os.Args[2:]); err != nil {
+			return err
+		}
+	case "listaddresses":
+		if err := listAddressesCmd.Parse(os.Args[2:]); err != nil {
 			return err
 		}
 	case "printchain":
@@ -58,7 +67,7 @@ func (cli *CLI) Run() error {
 			getBalanceCmd.Usage()
 			return nil
 		}
-		cli.getBalance(*getBalanceAddress)
+		cli.getBalance([]byte(*getBalanceAddress))
 	}
 
 	if createBlockchainCmd.Parsed() {
@@ -67,6 +76,14 @@ func (cli *CLI) Run() error {
 			return nil
 		}
 		cli.createBlockchain(*createBlockchainAddress)
+	}
+
+	if createWalletCmd.Parsed() {
+		cli.createWallet()
+	}
+
+	if listAddressesCmd.Parsed() {
+		cli.listAddresses()
 	}
 
 	if printChainCmd.Parsed() {
@@ -82,95 +99,4 @@ func (cli *CLI) Run() error {
 		cli.send(*sendFrom, *sendTo, *sendAmount)
 	}
 	return nil
-}
-
-func (cli *CLI) createBlockchain(address string) {
-	bc, err := CreateBlockchain(address)
-	if err != nil {
-		cli.log.Warnf("err creating blockchain: %s", err)
-		return
-	}
-	if err = bc.db.Close(); err != nil {
-		cli.log.Warnf("err closing db: %s", err)
-		return
-	}
-}
-
-func (cli *CLI) addBlock(transactions []*Transaction) error {
-	return cli.bc.MineBlock(transactions)
-}
-
-func (cli *CLI) printChain() {
-	bci := cli.bc.Iterator()
-	for {
-		block, err := bci.Next()
-		if err != nil {
-			cli.log.Warnf("err getting next block: %s", err)
-			return
-		}
-		cli.log.Infof("Prev. hash: %x", block.PrevBlockHash)
-		cli.log.Infof("Transactions: %s", block.Transactions)
-		cli.log.Infof("Hash: %x", block.Hash)
-		pow := NewProofOfWork(block)
-		cli.log.Infof("PoW: %s", strconv.FormatBool(pow.Validate()))
-
-		if len(block.PrevBlockHash) == 0 {
-			break
-		}
-	}
-}
-
-func (cli *CLI) printUsage() {
-	cli.log.Infof("Usage:")
-	cli.log.Infof("  addblock -data BLOCK_DATA - add a block to the blockchain")
-	cli.log.Infof("  printchain - print all the blocks of the blockchain")
-}
-
-func (cli *CLI) validateArgs() {
-	if len(os.Args) < 2 {
-		cli.printUsage()
-		os.Exit(1)
-	}
-}
-
-func (cli *CLI) getBalance(address string) {
-	bc, err := GetBlockchain(address)
-	if err != nil {
-		cli.log.Warnf("err getting blockchain: %s", err)
-		return
-	}
-	balance := 0
-	UTXOs, err := bc.FindUTXO(address)
-	if err != nil {
-		cli.log.Warnf("err finding unspent transaction: %s", err)
-		return
-	}
-	for _, out := range UTXOs {
-		balance += out.Value
-	}
-	cli.log.Infof("Balance of %s: %d", address, balance)
-}
-
-func (cli *CLI) send(from, to string, amount int) {
-	bc, err := GetBlockchain(from)
-	if err != nil {
-		cli.log.Warnf("err getting blockchain: %s", err)
-		return
-	}
-	defer func() {
-		err = bc.db.Close()
-		if err != nil {
-			cli.log.Warnf("err closing db: %s", err)
-			return
-		}
-	}()
-	tx, err := CreateUTXOTransaction(from, to, amount, bc)
-	if err != nil {
-		cli.log.Warnf("err creating transaction: %s", err)
-		return
-	}
-	if err = bc.MineBlock([]*Transaction{tx}); err != nil {
-		cli.log.Warnf("err mining block: %s", tx.ID)
-		return
-	}
 }

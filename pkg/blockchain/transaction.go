@@ -22,12 +22,13 @@ type Transaction struct {
 type TXInput struct {
 	Txid      []byte
 	Vout      int
-	ScriptSig string
+	Signature []byte
+	PubKey    []byte
 }
 
 type TXOutput struct {
-	Value        int
-	ScriptPubKey string
+	Value      int
+	PubKeyHash []byte
 }
 
 func CreateCoinbaseTX(to, data string) (*Transaction, error) {
@@ -35,9 +36,9 @@ func CreateCoinbaseTX(to, data string) (*Transaction, error) {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
 
-	txin := TXInput{Txid: []byte{}, Vout: -1, ScriptSig: data}
-	txout := TXOutput{Value: subsidy, ScriptPubKey: to}
-	tx := Transaction{ID: nil, Vin: []TXInput{txin}, Vout: []TXOutput{txout}}
+	txin := TXInput{Txid: []byte{}, Vout: -1, PubKey: []byte(data)}
+	txout := NewTXOutput(subsidy, to)
+	tx := Transaction{ID: nil, Vin: []TXInput{txin}, Vout: []TXOutput{*txout}}
 	if err := tx.SetID(); err != nil {
 		return nil, err
 	}
@@ -49,7 +50,19 @@ func CreateUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transa
 	var inputs []TXInput
 	var outputs []TXOutput
 
-	acc, validOutputs, err := bc.FindSpendableOutputs(from, amount)
+	wallets, err := GetWallets()
+	if err != nil {
+		return nil, err
+	}
+	wallet, err := wallets.GetWallet(from)
+	if err != nil {
+		return nil, err
+	}
+	pubKeyHash, err := HashPubKey(wallet.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	acc, validOutputs, err := bc.FindSpendableOutputs(pubKeyHash, amount)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +76,12 @@ func CreateUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transa
 			return nil, err
 		}
 		for _, out := range outs {
-			inputs = append(inputs, TXInput{Txid: txID, Vout: out, ScriptSig: from})
+			inputs = append(inputs, TXInput{Txid: txID, Vout: out, PubKey: wallet.PublicKey})
 		}
 	}
-	outputs = append(outputs, TXOutput{Value: amount, ScriptPubKey: to})
+	outputs = append(outputs, *NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, TXOutput{Value: acc - amount, ScriptPubKey: from})
+		outputs = append(outputs, *NewTXOutput(acc-amount, from))
 	}
 
 	tx := Transaction{ID: nil, Vin: inputs, Vout: outputs}
@@ -94,10 +107,26 @@ func (tx Transaction) IsCoinbase() bool {
 	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
 }
 
-func (in *TXInput) CanUnlockOutputWith(unlockingData string) bool {
-	return in.ScriptSig == unlockingData
+func (in *TXInput) UsesKey(pubKeyHash []byte) (bool, error) {
+	lockingHash, err := HashPubKey(in.PubKey)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Compare(lockingHash, pubKeyHash) == 0, nil
 }
 
-func (out *TXOutput) CanBeUnlockedWith(unlockingData string) bool {
-	return out.ScriptPubKey == unlockingData
+func (out *TXOutput) Lock(address []byte) {
+	pubKeyHash := Base58Encode(address)
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	out.PubKeyHash = pubKeyHash
+}
+
+func (out *TXOutput) IsLockedWithKey(pubKeyHash []byte) bool {
+	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
+}
+
+func NewTXOutput(value int, address string) *TXOutput {
+	txo := TXOutput{value, nil}
+	txo.Lock([]byte(address))
+	return &txo
 }
