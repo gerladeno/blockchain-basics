@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-const subsidy = 1 / 210000
+const subsidy = 10
 
 var ErrInsufficientFunds = errors.New("not enough money")
 

@@ -50,6 +50,11 @@ func CreateBlockchain(address string) (*Blockchain, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func(db *bolt.DB) {
+		if err = db.Close(); err != nil {
+			panic(err)
+		}
+	}(db)
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		if b == nil {

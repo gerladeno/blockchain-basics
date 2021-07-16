@@ -8,11 +8,7 @@ import (
 )
 
 func main() {
-	bc, err := blockchain.CreateBlockchain("2323r23rf23")
-	if err != nil {
-		panic(err)
-	}
-	cli := blockchain.NewCLI(getLogger(), bc)
+	cli := blockchain.NewCLI(getLogger(), nil)
 	if err := cli.Run(); err != nil {
 		panic(err)
 	}

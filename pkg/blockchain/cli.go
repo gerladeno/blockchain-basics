@@ -108,11 +108,11 @@ func (cli *CLI) printChain() {
 			cli.log.Warnf("err getting next block: %s", err)
 			return
 		}
-		cli.log.Infof("Prev. hash: %x\n", block.PrevBlockHash)
-		cli.log.Infof("Transactions: %s\n", block.Transactions)
-		cli.log.Infof("Hash: %x\n", block.Hash)
+		cli.log.Infof("Prev. hash: %x", block.PrevBlockHash)
+		cli.log.Infof("Transactions: %s", block.Transactions)
+		cli.log.Infof("Hash: %x", block.Hash)
 		pow := NewProofOfWork(block)
-		cli.log.Infof("PoW: %s\n\n", strconv.FormatBool(pow.Validate()))
+		cli.log.Infof("PoW: %s", strconv.FormatBool(pow.Validate()))
 
 		if len(block.PrevBlockHash) == 0 {
 			break
@@ -148,7 +148,7 @@ func (cli *CLI) getBalance(address string) {
 	for _, out := range UTXOs {
 		balance += out.Value
 	}
-	cli.log.Infof("Balance of %s: %d\n", address, balance)
+	cli.log.Infof("Balance of %s: %d", address, balance)
 }
 
 func (cli *CLI) send(from, to string, amount int) {
