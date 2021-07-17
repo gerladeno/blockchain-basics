@@ -18,10 +18,6 @@ func (cli *CLI) createBlockchain(address string) {
 	}
 }
 
-func (cli *CLI) addBlock(transactions []*Transaction) error {
-	return cli.bc.MineBlock(transactions)
-}
-
 func (cli *CLI) printChain() {
 	bci := cli.bc.Iterator()
 	for {
@@ -62,7 +58,7 @@ func (cli *CLI) getBalance(address []byte) {
 		return
 	}
 	balance := 0
-	pubKeyHash := Base58Encode(address)
+	pubKeyHash := Base58Decode(address)
 	UTXOs, err := bc.FindUTXO(pubKeyHash[1 : len(pubKeyHash)-4])
 	if err != nil {
 		cli.log.Warnf("err finding unspent transaction: %s", err)
